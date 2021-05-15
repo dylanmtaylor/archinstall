@@ -323,9 +323,6 @@ class Installer():
 		if not(hasUEFI()): # TODO: Allow for grub even on EFI
 			self.base_packages.append('grub')
 										
-		self.pacstrap(self.base_packages)
-		self.helper_flags['base-strapped'] = True
-		#self.genfstab()
 		if not isVM():
 			vendor = cpuVendor()
 			if vendor ==  "AuthenticAMD":
@@ -338,6 +335,9 @@ class Installer():
 			fstab.write(
 				"\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n"
 			)  # Redundant \n at the start? who knows?
+					
+		self.pacstrap(self.base_packages)
+		self.helper_flags['base-strapped'] = True
 
 		## TODO: Support locale and timezone
 		#os.remove(f'{self.target}/etc/localtime')

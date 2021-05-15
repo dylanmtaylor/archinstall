@@ -338,7 +338,7 @@ class Installer():
 		with open(f"{self.target}/etc/fstab", "a") as fstab:
 			fstab.write(
 				"\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n"
-			)  # Redundant \n at the start? who knows?		
+			)  # Redundant \n at the start? who knows?
 
 		## TODO: Support locale and timezone
 		#os.remove(f'{self.target}/etc/localtime')

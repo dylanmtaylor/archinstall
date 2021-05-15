@@ -326,7 +326,7 @@ class Installer():
 		self.pacstrap(self.base_packages)
 		self.helper_flags['base-strapped'] = True
 		#self.genfstab()
-		if not isVM():
+		if True:
 			vendor = cpuVendor()
 			if vendor ==  "AuthenticAMD":
 				self.base_packages.append("amd-ucode")
@@ -414,7 +414,7 @@ class Installer():
 				entry.write(f'# Created on: {self.init_time}\n')
 				entry.write(f'title Arch Linux\n')
 				entry.write(f'linux /vmlinuz-linux\n')
-				if not isVM():
+				if True:
 					vendor = cpuVendor()
 					if vendor ==  "AuthenticAMD":
 						entry.write("initrd /amd-ucode.img\n")

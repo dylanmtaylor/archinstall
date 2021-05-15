@@ -331,13 +331,14 @@ class Installer():
 				self.base_packages.append("intel-ucode")
 			else:
 				self.log("Unknown cpu vendor not installing ucode")
-		with open(f"{self.target}/etc/fstab", "a") as fstab:
-			fstab.write(
-				"\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n"
-			)  # Redundant \n at the start? who knows?
 					
 		self.pacstrap(self.base_packages)
 		self.helper_flags['base-strapped'] = True
+
+		with open(f"{self.target}/etc/fstab", "a") as fstab:
+			fstab.write(
+				"\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n"
+			)  # Redundant \n at the start? who knows?		
 
 		## TODO: Support locale and timezone
 		#os.remove(f'{self.target}/etc/localtime')

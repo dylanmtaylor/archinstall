@@ -110,6 +110,4 @@ def cpu_vendor() -> Optional[str]:
 def is_vm() -> bool:
 	return False
 
-	return False
-
 # TODO: Add more identifiers

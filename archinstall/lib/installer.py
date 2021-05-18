@@ -1,8 +1,8 @@
 from .disk import *
 from .hardware import *
+from .locale_helpers import verify_x11_keyboard_layout
 from .mirrors import *
 from .storage import storage
-from .systemd import Networkd
 from .user_interaction import *
 
 # Any package that the Installer() is responsible for (optional and the default ones)
@@ -215,6 +215,8 @@ class Installer:
 		subprocess.check_call(f"/usr/bin/arch-chroot {self.target}", shell=True)
 
 	def configure_nic(self, nic, dhcp=True, ip=None, gateway=None, dns=None, *args, **kwargs):
+		from .systemd import Networkd
+
 		if dhcp:
 			conf = Networkd(Match={"Name": nic}, Network={"DHCP": "yes"})
 		else:
@@ -513,11 +515,38 @@ class Installer:
 		o = b''.join(SysCommand(f"/usr/bin/arch-chroot {self.target} sh -c \"chsh -s {shell} {user}\""))
 		pass
 
-	def set_keyboard_language(self, language):
+	def set_keyboard_language(self, language: str) -> bool:
 		if len(language.strip()):
-			with open(f'{self.target}/etc/vconsole.conf', 'w') as vconsole:
-				vconsole.write(f'KEYMAP={language}\n')
-				vconsole.write('FONT=lat9w-16\n')
+			if not verify_keyboard_layout(language):
+				self.log(f"Invalid keyboard language specified: {language}", fg="red", level=logging.ERROR)
+				return False
+
+			# In accordance with https://github.com/archlinux/archinstall/issues/107#issuecomment-841701968
+			# Setting an empty keymap first, allows the subsequent call to set layout for both console and x11.
+			self.arch_chroot('localectl set-keymap ""')
+
+			if (output := self.arch_chroot(f'localectl set-keymap {language}')).exit_code != 0:
+				raise ServiceException(f"Unable to set locale '{language}' for console: {output}")
+
+			self.log(f"Keyboard language for this installation is now set to: {language}")
 		else:
-			self.log('Keyboard language was not changed from default (no language specified).', fg="yellow", level=logging.INFO)
+			self.log(f'Keyboard language was not changed from default (no language specified).', fg="yellow", level=logging.INFO)
+
+		return True
+
+	def set_x11_keyboard_language(self, language: str) -> bool:
+		"""
+		A fallback function to set x11 layout specifically and separately from console layout.
+		This isn't strictly necessary since .set_keyboard_language() does this as well.
+		"""
+		if len(language.strip()):
+			if not verify_x11_keyboard_layout(language):
+				self.log(f"Invalid x11-keyboard language specified: {language}", fg="red", level=logging.ERROR)
+				return False
+
+			if (output := self.arch_chroot(f'localectl set-x11-keymap {language}')).exit_code != 0:
+				raise ServiceException(f"Unable to set locale '{language}' for X11: {output}")
+		else:
+			self.log(f'X11-Keyboard language was not changed from default (no language specified).', fg="yellow", level=logging.INFO)
+
 		return True

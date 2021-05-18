@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import os
 
 import archinstall
 from archinstall.lib.hardware import has_uefi
@@ -324,7 +325,6 @@ def perform_installation(mountpoint):
 				installation.set_mirrors(archinstall.arguments['mirror-region'])  # Set the mirrors in the installation medium
 			if archinstall.arguments["bootloader"] == "grub-install" and has_uefi():
 				installation.add_additional_packages("grub")
-			installation.set_keyboard_language(archinstall.arguments['keyboard-language'])
 			installation.add_bootloader(archinstall.arguments["bootloader"])
 
 			# If user selected to copy the current ISO network configuration
@@ -370,6 +370,10 @@ def perform_installation(mountpoint):
 			if (root_pw := archinstall.arguments.get('!root-password', None)) and len(root_pw):
 				installation.user_set_pw('root', root_pw)
 
+			# This step must be after profile installs to allow profiles to install language pre-requisits.
+			# After which, this step will set the language both for console and x11 if x11 was installed for instance.
+			installation.set_keyboard_language(archinstall.arguments['keyboard-language'])
+
 			if archinstall.arguments['profile'] and archinstall.arguments['profile'].has_post_install():
 				with archinstall.arguments['profile'].load_instructions(namespace=f"{archinstall.arguments['profile'].namespace}.py") as imported:
 					if not imported._post_install():
@@ -389,7 +393,8 @@ def perform_installation(mountpoint):
 
 
 if not check_mirror_reachable():
-	archinstall.log("Arch Linux mirrors are not reachable. Please check your internet connection and try again.", level=logging.INFO, fg="red")
+	log_file = os.path.join(archinstall.storage.get('LOG_PATH', None), archinstall.storage.get('LOG_FILE', None))
+	archinstall.log(f"Arch Linux mirrors are not reachable. Please check your internet connection and the log file '{log_file}'.", level=logging.INFO, fg="red")
 	exit(1)
 
 ask_user_questions()

@@ -4,6 +4,7 @@ import logging
 import os
 import pty
 import shlex
+import subprocess
 import sys
 import time
 from datetime import datetime, date
@@ -153,8 +154,17 @@ class SysCommandWorker:
 			except:
 				pass
 
+		if self.peak_output:
+			# To make sure any peaked output didn't leave us hanging
+			# on the same line we were on.
+			sys.stdout.write("\n")
+			sys.stdout.flush()
+
 		if len(args) >= 2 and args[1]:
 			log(args[1], level=logging.ERROR, fg='red')
+
+		if self.exit_code != 0:
+			raise SysCallError(f"{self.cmd} exited with abnormal exit code: {self.exit_code}")
 
 	def is_alive(self):
 		self.poll()
@@ -220,19 +230,18 @@ class SysCommandWorker:
 	def poll(self):
 		self.make_sure_we_are_executing()
 
-		no_output = True
+		got_output = False
 		for fileno, event in self.poll_object.poll(0.1):
 			try:
 				output = os.read(self.child_fd, 8192)
-				no_output = False
+				got_output = True
 				self.peak(output)
 				self._trace_log += output
-				return True
 			except OSError as err:
 				self.ended = time.time()
 				break
 
-		if no_output:
+		if self.ended or (got_output is False and pid_exists(self.pid) is False):
 			self.ended = time.time()
 			try:
 				self.exit_code = os.waitpid(self.pid, 0)[1]
@@ -285,10 +294,9 @@ class SysCommand:
 		self.working_directory = working_directory
 
 		self.session = None
-
-	def __enter__(self):
 		self.create_session()
 
+	def __enter__(self):
 		return self.session
 
 	def __exit__(self, *args, **kwargs):
@@ -299,13 +307,11 @@ class SysCommand:
 			log(args[1], level=logging.ERROR, fg='red')
 
 	def __iter__(self, *args, **kwargs):
-		self.create_session()
 
 		for line in self.session:
 			yield line
 
 	def __repr__(self, *args, **kwargs):
-		self.create_session()
 		return self.session._trace_log.decode('UTF-8')
 
 	def __json__(self):
@@ -333,12 +339,15 @@ class SysCommand:
 		return True
 
 	def decode(self, fmt='UTF-8'):
-		return self.session.trace_log.decode(fmt)
+		return self.session._trace_log.decode(fmt)
 
 	@property
 	def exit_code(self):
-		self.create_session()
 		return self.session.exit_code
+
+	@property
+	def trace_log(self):
+		return self.session._trace_log
 
 
 def prerequisite_check():
@@ -350,3 +359,9 @@ def prerequisite_check():
 
 def reboot():
 	o = b''.join(SysCommand("/usr/bin/reboot"))
+
+def pid_exists(pid :int):
+	try:
+		return any(subprocess.check_output(['/usr/bin/ps', '--no-headers', '-o', 'pid', '-p', str(pid)]).strip())
+	except subprocess.CalledProcessError:
+		return False

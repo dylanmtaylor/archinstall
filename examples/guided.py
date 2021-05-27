@@ -4,13 +4,17 @@ import os
 import time
 
 import archinstall
-from archinstall.lib.hardware import has_uefi
+from archinstall.lib.general import run_custom_user_commands
+from archinstall.lib.hardware import has_uefi, AVAILABLE_GFX_DRIVERS
 from archinstall.lib.networking import check_mirror_reachable
 from archinstall.lib.profiles import Profile
 
 if archinstall.arguments.get('help'):
 	print("See `man archinstall` for help.")
 	exit(0)
+if os.getuid() != 0:
+	print("Archinstall requires root privileges to run. See --help for more.")
+	exit(1)
 
 # For support reasons, we'll log the disk layout pre installation to match against post-installation layout
 archinstall.log(f"Disk states before installing: {archinstall.disk_layouts()}", level=logging.DEBUG)
@@ -46,6 +50,16 @@ def ask_user_questions():
 	else:
 		selected_region = archinstall.arguments['mirror-region']
 		archinstall.arguments['mirror-region'] = {selected_region: archinstall.list_mirrors()[selected_region]}
+
+	if not archinstall.arguments.get('sys-language', None) and archinstall.arguments.get('advanced', False):
+		archinstall.arguments['sys-language'] = input("Enter a valid locale (language) for your OS, (Default: en_US): ").strip()
+		archinstall.arguments['sys-encoding'] = input("Enter a valid system default encoding for your OS, (Default: utf-8): ").strip()
+		archinstall.log("Keep in mind that if you want multiple locales, post configuration is required.", fg="yellow")
+
+	if not archinstall.arguments.get('sys-language', None):
+		archinstall.arguments['sys-language'] = 'en_US'
+	if not archinstall.arguments.get('sys-encoding', None):
+		archinstall.arguments['sys-encoding'] = 'utf-8'
 
 	# Ask which harddrive/block-device we will install to
 	if archinstall.arguments.get('harddrive', None):
@@ -178,18 +192,15 @@ def ask_user_questions():
 
 	# Ask for archinstall-specific profiles (such as desktop environments etc)
 	if not archinstall.arguments.get('profile', None):
-		archinstall.arguments['profile'] = archinstall.select_profile(archinstall.list_profiles(filter_top_level_profiles=True))
+		archinstall.arguments['profile'] = archinstall.select_profile()
 	else:
-		archinstall.arguments['profile'] = archinstall.list_profiles()[archinstall.arguments['profile']]
+		archinstall.arguments['profile'] = Profile(installer=None, path=archinstall.arguments['profile'])
 
 	# Check the potentially selected profiles preparations to get early checks if some additional questions are needed.
 	if archinstall.arguments['profile'] and archinstall.arguments['profile'].has_prep_function():
 		with archinstall.arguments['profile'].load_instructions(namespace=f"{archinstall.arguments['profile'].namespace}.py") as imported:
 			if not imported._prep_function():
-				archinstall.log(
-					' * Profile\'s preparation requirements was not fulfilled.',
-					fg='red'
-				)
+				archinstall.log(' * Profile\'s preparation requirements was not fulfilled.', fg='red')
 				exit(1)
 
 	# Ask about audio server selection if one is not already set
@@ -235,6 +246,12 @@ def ask_user_questions():
 
 	if not archinstall.arguments.get('timezone', None):
 		archinstall.arguments['timezone'] = archinstall.ask_for_a_timezone()
+
+	if archinstall.arguments['timezone']:
+		if not archinstall.arguments.get('ntp', False):
+			archinstall.arguments['ntp'] = input("Would you like to use automatic time synchronization (NTP) with the default time servers? [Y/n]: ").strip().lower() in ('y', 'yes', '')
+			if archinstall.arguments['ntp']:
+				archinstall.log("Hardware time and other post-configuration steps might be required in order for NTP to work. For more information, please check the Arch wiki.", fg="yellow")
 
 
 def perform_installation_steps():
@@ -321,6 +338,7 @@ def perform_installation(mountpoint):
 		if archinstall.arguments.get('mirror-region', None):
 			archinstall.use_mirrors(archinstall.arguments['mirror-region'])  # Set the mirrors for the live medium
 		if installation.minimal_installation():
+			installation.set_locale(archinstall.arguments['sys-language'], archinstall.arguments['sys-encoding'].upper())
 			installation.set_hostname(archinstall.arguments['hostname'])
 			if archinstall.arguments['mirror-region'].get("mirrors", None) is not None:
 				installation.set_mirrors(archinstall.arguments['mirror-region'])  # Set the mirrors in the installation medium
@@ -368,6 +386,9 @@ def perform_installation(mountpoint):
 			if timezone := archinstall.arguments.get('timezone', None):
 				installation.set_timezone(timezone)
 
+			if archinstall.arguments.get('ntp', False):
+				installation.activate_ntp()
+
 			if (root_pw := archinstall.arguments.get('!root-password', None)) and len(root_pw):
 				installation.user_set_pw('root', root_pw)
 
@@ -380,6 +401,15 @@ def perform_installation(mountpoint):
 					if not imported._post_install():
 						archinstall.log(' * Profile\'s post configuration requirements was not fulfilled.', fg='red')
 						exit(1)
+
+		# If the user provided a list of services to be enabled, pass the list to the enable_service function.
+		# Note that while it's called enable_service, it can actually take a list of services and iterate it.
+		if archinstall.arguments.get('services', None):
+			installation.enable_service(*archinstall.arguments['services'])
+
+		# If the user provided custom commands to be run post-installation, execute them now.
+		if archinstall.arguments.get('custom-commands', None):
+			run_custom_user_commands(archinstall.arguments['custom-commands'], installation)
 
 		installation.log("For post-installation tips, see https://wiki.archlinux.org/index.php/Installation_guide#Post-installation", fg="yellow")
 		if not archinstall.arguments.get('silent'):
@@ -410,8 +440,16 @@ else:
 	# Temporarily disabling keep_partitions if config file is loaded
 	archinstall.arguments['harddrive'].keep_partitions = False
 	# Temporary workaround to make Desktop Environments work
-	archinstall.storage['_desktop_profile'] = archinstall.arguments.get('desktop', None)
-	if archinstall.arguments.get('profile', None):
-		archinstall.arguments['profile'] = Profile(installer=None, path=archinstall.arguments['profile']['path'])
+	if archinstall.arguments.get('profile', None) is not None:
+		archinstall.arguments['profile'] = archinstall.Profile(None, archinstall.arguments.get('profile', None))
+	else:
+		archinstall.arguments['profile'] = None
+	if archinstall.arguments.get('mirror-region', None) is not None:
+		selected_region = archinstall.arguments.get('mirror-region', None)
+		archinstall.arguments['mirror-region'] = {selected_region: archinstall.list_mirrors()[selected_region]}
+	archinstall.arguments['sys-language'] = archinstall.arguments.get('sys-language', 'en_US')
+	archinstall.arguments['sys-encoding'] = archinstall.arguments.get('sys-encoding', 'utf-8')
+	if archinstall.arguments.get('gfx_driver', None) is not None:
+		archinstall.storage['gfx_driver_packages'] = AVAILABLE_GFX_DRIVERS.get(archinstall.arguments.get('gfx_driver', None), None)
 
 perform_installation_steps()

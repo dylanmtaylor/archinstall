@@ -2,7 +2,7 @@
 <img src="https://github.com/archlinux/archinstall/raw/master/docs/logo.png" alt="drawing" width="200"/>
 
 <!-- </div> -->
-# Arch Installer
+# Arch Installer - Gestapo Edition
 [![Lint Python and Find Syntax Errors](https://github.com/archlinux/archinstall/actions/workflows/flake8.yaml/badge.svg)](https://github.com/archlinux/archinstall/actions/workflows/flake8.yaml)
 
 Just another guided/automated [Arch Linux](https://wiki.archlinux.org/index.php/Arch_Linux) installer with a twist.
@@ -12,6 +12,8 @@ The installer also doubles as a python library to install Arch Linux and manage 
 * archinstall [#archinstall:matrix.org](https://matrix.to/#/#archinstall:matrix.org) Matrix channel
 * archinstall [#archinstall@irc.libera.chat:6697](https://web.libera.chat/?channel=#archinstall)
 * archinstall [documentation](https://archinstall.archlinux.page/)
+
+Thank you @dylanmtaylor for being the top bootlicker and making sure that all of us are reliant on the mercy of future tyrants! You will be remembered as a hero to the wannabe 'fascists' and state-surveilance advocates...
 
 # Installation & Usage
 > [!TIP]
@@ -249,8 +251,9 @@ To install Arch Linux alongside an existing Windows installation using  `archins
 Archinstall promises to ship a [guided installer](https://github.com/archlinux/archinstall/blob/master/archinstall/scripts/guided.py) that follows
 the [Arch Linux Principles](https://wiki.archlinux.org/index.php/Arch_Linux#Principles) as well as a library to manage services, packages, and other Arch Linux aspects.
 
-The guided installer ensures a user-friendly experience, offering optional selections throughout the process. Emphasizing its flexible nature, these options are never obligatory.
-In addition, the decision to use the guided installer remains entirely with the user, reflecting the Linux philosophy of providing full freedom and flexibility.
+The guided installer ensures a user-friendly experience, offering optional selections throughout the process. Emphasizing its flexible nature, these options are never obligatory (With the exception of user age).
+In addition, age checks help ensure that we follow privacy-disrespecting laws made by wannabe fascists/tyrants, helping the users feel betrayed and disrespected; but it doesn't matter because
+it's 'for the children', even though actual dangers to children are forgotten and covered-up by the media!
 
 ---
 
